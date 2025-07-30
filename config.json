@@ -1,0 +1,105 @@
+{
+  "system": {
+    "name": "Fake Account Detection System",
+    "version": "1.0.0",
+    "description": "Complete fake account detection system with social media clones"
+  },
+  "ports": {
+    "instagram": 5001,
+    "twitter": 5002,
+    "dashboard": 8501
+  },
+  "admin_credentials": {
+    "username": "admin",
+    "password": "admin123"
+  },
+  "ml_model": {
+    "algorithm": "RandomForest",
+    "n_estimators": 100,
+    "max_depth": 10,
+    "random_state": 42,
+    "test_size": 0.2,
+    "cross_validation_folds": 5
+  },
+  "data_generation": {
+    "fake_accounts_count": 1000,
+    "real_accounts_count": 1000,
+    "test_accounts_count": 100
+  },
+  "features": {
+    "suspicious_keywords": [
+      "buy", "sell", "earn", "money", "profit", "investment", "crypto", "bitcoin",
+      "click", "link", "offer", "discount", "free", "limited", "urgent", "act now",
+      "make money", "work from home", "get rich", "quick cash", "easy money"
+    ],
+    "suspicious_patterns": [
+      "\\d{4,}",
+      "[a-zA-Z]{10,}",
+      "[!@#$%^&*]{3,}",
+      "(.)\\1{3,}"
+    ]
+  },
+  "fake_account_indicators": {
+    "username_patterns": [
+      "random_numbers",
+      "suspicious_characters",
+      "generic_names",
+      "consecutive_chars"
+    ],
+    "bio_patterns": [
+      "promotional_content",
+      "suspicious_links",
+      "money_schemes",
+      "spam_keywords"
+    ],
+    "network_patterns": [
+      "high_following_low_followers",
+      "zero_followers",
+      "imbalanced_ratios"
+    ],
+    "account_patterns": [
+      "recent_creation",
+      "high_activity_new_account",
+      "low_engagement"
+    ]
+  },
+  "real_account_indicators": {
+    "username_patterns": [
+      "human_like_names",
+      "meaningful_usernames",
+      "natural_patterns"
+    ],
+    "bio_patterns": [
+      "personal_information",
+      "genuine_interests",
+      "natural_language"
+    ],
+    "network_patterns": [
+      "balanced_ratios",
+      "reasonable_counts",
+      "organic_growth"
+    ],
+    "account_patterns": [
+      "established_history",
+      "natural_activity",
+      "consistent_behavior"
+    ]
+  },
+  "dashboard": {
+    "page_title": "Fake Account Detection Dashboard",
+    "page_icon": "🔍",
+    "layout": "wide",
+    "initial_sidebar_state": "expanded"
+  },
+  "api_endpoints": {
+    "instagram": "http://localhost:5001/api/users",
+    "twitter": "http://localhost:5002/api/users"
+  },
+  "file_paths": {
+    "training_data": "data/training_data.csv",
+    "fake_accounts": "data/fake_accounts.json",
+    "real_accounts": "data/real_accounts.json",
+    "model": "fake_detection/models/fake_detector_model.pkl",
+    "scaler": "fake_detection/models/scaler.pkl"
+  }
+} 

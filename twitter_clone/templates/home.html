@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Twitter Clone{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        {% for tweet in tweets %}
+        <div class="tweet-card">
+            <div class="tweet-header">
+                <img src="{{ tweet.author.profile_pic }}" alt="{{ tweet.author.username }}" class="profile-pic">
+                <div>
+                    <div class="fw-bold">{{ tweet.author.username }}</div>
+                    <small class="text-muted">{{ tweet.created_at.strftime('%b %d') }}</small>
+                    {% if tweet.author.is_fake %}
+                    <span class="fake-badge ms-2">FAKE</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="tweet-content">
+                {{ tweet.content }}
+            </div>
+            
+            <div class="tweet-actions">
+                <button class="action-btn like-btn" data-tweet-id="{{ tweet.id }}">
+                    <i class="far fa-heart"></i>
+                    <span class="ms-1">{{ tweet.likes|length }}</span>
+                </button>
+                <button class="action-btn retweet-btn" data-tweet-id="{{ tweet.id }}">
+                    <i class="fas fa-retweet"></i>
+                    <span class="ms-1">{{ tweet.retweets|length }}</span>
+                </button>
+                <button class="action-btn">
+                    <i class="far fa-comment"></i>
+                </button>
+                <button class="action-btn">
+                    <i class="far fa-share-square"></i>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not tweets %}
+        <div class="text-center">
+            <h4>No tweets yet!</h4>
+            <p>Follow some users to see their tweets here.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Welcome, {{ current_user.username }}!</h5>
+                    <p class="card-text">What's happening?</p>
+                    <a href="{{ url_for('create_tweet') }}" class="btn btn-primary">Tweet</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('.like-btn').click(function() {
+        var tweetId = $(this).data('tweet-id');
+        var btn = $(this);
+        
+        $.post('/like/' + tweetId, function(data) {
+            if (data.status === 'liked') {
+                btn.addClass('liked');
+                btn.find('i').removeClass('far').addClass('fas');
+            } else {
+                btn.removeClass('liked');
+                btn.find('i').removeClass('fas').addClass('far');
+            }
+            location.reload();
+        });
+    });
+    
+    $('.retweet-btn').click(function() {
+        var tweetId = $(this).data('tweet-id');
+        var btn = $(this);
+        
+        $.post('/retweet/' + tweetId, function(data) {
+            if (data.status === 'retweeted') {
+                btn.addClass('retweeted');
+            } else {
+                btn.removeClass('retweeted');
+            }
+            location.reload();
+        });
+    });
+});
+</script>
+{% endblock %} 

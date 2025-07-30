@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Create Tweet - Twitter Clone{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4>What's happening?</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <textarea class="form-control" id="content" name="content" rows="4" placeholder="What's happening?" maxlength="280" required></textarea>
+                        <div class="form-text">
+                            <span id="char-count">280</span> characters remaining
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Tweet</button>
+                    <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('#content').on('input', function() {
+        var maxLength = 280;
+        var currentLength = $(this).val().length;
+        var remaining = maxLength - currentLength;
+        $('#char-count').text(remaining);
+        
+        if (remaining < 0) {
+            $('#char-count').addClass('text-danger');
+        } else {
+            $('#char-count').removeClass('text-danger');
+        }
+    });
+});
+</script>
+{% endblock %} 

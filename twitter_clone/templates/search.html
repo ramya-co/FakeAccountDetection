@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Search - Twitter Clone{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4>Search Users</h4>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('search') }}" class="mb-4">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="q" value="{{ query }}" placeholder="Search for users...">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </form>
+                
+                {% if query %}
+                    {% if users %}
+                        <h5>Search results for "{{ query }}"</h5>
+                        {% for user in users %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <img src="{{ user.profile_pic }}" alt="{{ user.username }}" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            <a href="{{ url_for('profile', username=user.username) }}" class="text-decoration-none">{{ user.username }}</a>
+                                            {% if user.is_fake %}
+                                            <span class="fake-badge ms-2">FAKE</span>
+                                            {% endif %}
+                                        </h6>
+                                        <p class="text-muted mb-1">{{ user.bio[:100] }}{% if user.bio|length > 100 %}...{% endif %}</p>
+                                        <small class="text-muted">{{ user.followers|length }} followers • {{ user.tweets|length }} tweets</small>
+                                    </div>
+                                    {% if current_user.id != user.id %}
+                                    <button class="btn btn-sm btn-outline-primary follow-btn" data-user-id="{{ user.id }}">
+                                        Follow
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center">
+                            <h5>No users found</h5>
+                            <p class="text-muted">Try searching for a different username.</p>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center">
+                        <h5>Search for users</h5>
+                        <p class="text-muted">Enter a username to search for users.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Search Tips</h5>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-search text-primary"></i> Search by username</li>
+                        <li><i class="fas fa-users text-primary"></i> Find people to follow</li>
+                        <li><i class="fas fa-info-circle text-primary"></i> View user profiles</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('.follow-btn').click(function() {
+        var userId = $(this).data('user-id');
+        var btn = $(this);
+        
+        $.post('/follow/' + userId, function(data) {
+            if (data.status === 'followed') {
+                btn.text('Unfollow').removeClass('btn-outline-primary').addClass('btn-primary');
+            } else {
+                btn.text('Follow').removeClass('btn-primary').addClass('btn-outline-primary');
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

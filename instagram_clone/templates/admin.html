@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Instagram Clone{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4>Admin Panel - User Management</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Created</th>
+                                <th>Followers</th>
+                                <th>Following</th>
+                                <th>Posts</th>
+                                <th>Fake Score</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>
+                                    <a href="{{ url_for('profile', username=user.username) }}">{{ user.username }}</a>
+                                    {% if user.is_fake %}
+                                    <span class="fake-badge ms-2">FAKE</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.email }}</td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ user.followers|length }}</td>
+                                <td>{{ user.following|length }}</td>
+                                <td>{{ user.posts|length }}</td>
+                                <td>
+                                    <span class="badge {% if user.fake_score > 0.7 %}bg-danger{% elif user.fake_score > 0.4 %}bg-warning{% else %}bg-success{% endif %}">
+                                        {{ "%.2f"|format(user.fake_score) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if user.is_fake %}
+                                    <span class="badge bg-danger">Fake</span>
+                                    {% else %}
+                                    <span class="badge bg-success">Real</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary toggle-fake-btn" data-user-id="{{ user.id }}" data-current-status="{{ user.is_fake|lower }}">
+                                        {% if user.is_fake %}Mark Real{% else %}Mark Fake{% endif %}
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col">
+                        <h3>{{ users|length }}</h3>
+                        <small class="text-muted">Total Users</small>
+                    </div>
+                    <div class="col">
+                        <h3>{{ users|selectattr('is_fake', 'equalto', True)|list|length }}</h3>
+                        <small class="text-muted">Fake Accounts</small>
+                    </div>
+                    <div class="col">
+                        <h3>{{ "%.1f"|format((users|selectattr('is_fake', 'equalto', True)|list|length / users|length * 100) if users|length > 0 else 0) }}%</h3>
+                        <small class="text-muted">Fake Percentage</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary me-2" onclick="exportData()">Export Data</button>
+                <button class="btn btn-warning me-2" onclick="runFakeDetection()">Run Fake Detection</button>
+                <button class="btn btn-info" onclick="generateTestData()">Generate Test Data</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('.toggle-fake-btn').click(function() {
+        var userId = $(this).data('user-id');
+        var currentStatus = $(this).data('current-status');
+        var btn = $(this);
+        
+        var newStatus = !(currentStatus === 'true');
+        var fakeScore = newStatus ? Math.random() * 0.3 + 0.7 : Math.random() * 0.3;
+        
+        $.ajax({
+            url: '/api/update_fake_score/' + userId,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                is_fake: newStatus,
+                fake_score: fakeScore
+            }),
+            success: function(data) {
+                location.reload();
+            }
+        });
+    });
+});
+
+function exportData() {
+    window.open('/api/users', '_blank');
+}
+
+function runFakeDetection() {
+    alert('Fake detection will be run on all users. Check the dashboard for results.');
+}
+
+function generateTestData() {
+    if (confirm('This will generate additional test data. Continue?')) {
+        // This would typically make an API call to generate more data
+        alert('Test data generation feature would be implemented here.');
+    }
+}
+</script>
+{% endblock %} 

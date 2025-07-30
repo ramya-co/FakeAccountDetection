@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Instagram Clone{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        {% for post in posts %}
+        <div class="post-card">
+            <div class="post-header d-flex align-items-center">
+                <img src="{{ post.author.profile_pic }}" alt="{{ post.author.username }}" class="profile-pic me-3">
+                <div>
+                    <a href="{{ url_for('profile', username=post.author.username) }}" class="text-decoration-none text-dark fw-bold">
+                        {{ post.author.username }}
+                    </a>
+                    {% if post.author.is_fake %}
+                    <span class="fake-badge ms-2">FAKE</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <img src="{{ post.image_url }}" alt="Post image" class="post-image">
+            
+            <div class="post-actions">
+                <button class="btn btn-link text-dark p-0 me-3 like-btn" data-post-id="{{ post.id }}">
+                    <i class="far fa-heart"></i>
+                </button>
+                <button class="btn btn-link text-dark p-0 me-3" data-bs-toggle="collapse" data-bs-target="#comments-{{ post.id }}">
+                    <i class="far fa-comment"></i>
+                </button>
+                <small class="text-muted">{{ post.created_at.strftime('%B %d, %Y') }}</small>
+            </div>
+            
+            <div class="post-caption">
+                <strong>{{ post.author.username }}</strong> {{ post.caption }}
+            </div>
+            
+            <div class="collapse" id="comments-{{ post.id }}">
+                <div class="px-3 pb-3">
+                    <form method="POST" action="{{ url_for('comment_post', post_id=post.id) }}" class="mb-2">
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="content" placeholder="Add a comment..." required>
+                            <button class="btn btn-outline-primary" type="submit">Post</button>
+                        </div>
+                    </form>
+                    {% for comment in post.comments %}
+                    <div class="mb-1">
+                        <strong>{{ comment.user.username }}</strong> {{ comment.content }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not posts %}
+        <div class="text-center">
+            <h4>No posts yet!</h4>
+            <p>Follow some users to see their posts here.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Welcome, {{ current_user.username }}!</h5>
+                    <p class="card-text">Discover new content and connect with others.</p>
+                    <a href="{{ url_for('create_post') }}" class="btn btn-primary">Create Post</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('.like-btn').click(function() {
+        var postId = $(this).data('post-id');
+        var btn = $(this);
+        
+        $.post('/like/' + postId, function(data) {
+            if (data.status === 'liked') {
+                btn.find('i').removeClass('far').addClass('fas text-danger');
+            } else {
+                btn.find('i').removeClass('fas text-danger').addClass('far');
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 
