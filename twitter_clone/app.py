@@ -31,6 +31,7 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_fake = db.Column(db.Boolean, default=False)
     fake_score = db.Column(db.Float, default=0.0)
+    analysis_data = db.Column(db.Text, default='{}')  # Store detailed analysis as JSON
     
     tweets = db.relationship('Tweet', backref='author', lazy=True)
     followers = db.relationship('Follow', foreign_keys='Follow.followed_id', backref='followed', lazy=True)
@@ -80,6 +81,7 @@ def register():
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
+        bio = request.form.get('bio', '')  # Get bio from form
         
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
@@ -93,13 +95,58 @@ def register():
             username=username,
             email=email,
             password_hash=generate_password_hash(password),
-            bio=fake.text(max_nb_chars=160),
+            bio=bio,  # Use user-provided bio
             profile_pic=f'https://picsum.photos/150/150?random={random.randint(1, 1000)}'
         )
         db.session.add(user)
         db.session.commit()
         
-        flash('Registration successful! Please login.')
+        # Run real-time fake account detection
+        try:
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from fake_detection.detector import FakeAccountDetector
+            from fake_detection.feature_extractor import FeatureExtractor
+            import json
+            
+            detector = FakeAccountDetector()
+            if detector.load_model():
+                # Prepare user data for analysis
+                user_data = {
+                    'username': user.username,
+                    'bio': user.bio,
+                    'created_at': user.created_at.isoformat(),
+                    'follower_count': 0,
+                    'following_count': 0,
+                    'post_count': 0
+                }
+                
+                # Run fake detection
+                result = detector.predict_single_user(user_data)
+                explanation = detector.explain_prediction(user_data)
+                
+                # Update user with detection results
+                user.is_fake = result['is_fake']
+                user.fake_score = result['fake_probability']
+                user.analysis_data = json.dumps(explanation)
+                db.session.commit()
+                
+                print(f"🔍 Fake detection for {username}: {result['is_fake']} (score: {result['fake_probability']:.3f})")
+                
+                # Show detection result to user
+                if result['is_fake']:
+                    flash(f'Account created! ⚠️ Fake detection score: {result["fake_probability"]:.1%}')
+                else:
+                    flash(f'Account created! ✅ Fake detection score: {result["fake_probability"]:.1%}')
+            else:
+                print("❌ Could not load fake detection model")
+                flash('Account created! (Fake detection unavailable)')
+                
+        except Exception as e:
+            print(f"❌ Error running fake detection: {e}")
+            flash('Account created! (Fake detection error)')
+        
         return redirect(url_for('login'))
     
     return render_template('register.html')
@@ -235,6 +282,7 @@ def api_users():
         'created_at': user.created_at.isoformat(),
         'is_fake': user.is_fake,
         'fake_score': user.fake_score,
+        'analysis_data': user.analysis_data,  # Include detailed analysis
         'follower_count': len(user.followers),
         'following_count': len(user.following),
         'tweet_count': len(user.tweets)

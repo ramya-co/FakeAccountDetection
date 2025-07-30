@@ -1,14 +1,12 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import json
-import os
-import sys
 from datetime import datetime
-import time
+import sys
+import os
 
 # Add parent directory to path to import fake detection modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -41,7 +39,7 @@ st.sidebar.markdown("---")
 # Navigation
 page = st.sidebar.selectbox(
     "Choose a page",
-    ["📊 Overview", "🔍 Single User Analysis", "📁 Batch Analysis", "📈 Model Performance", "⚙️ Settings"]
+    ["📊 Overview", "👥 User Analysis", "🔍 Single User Analysis", "📁 Batch Analysis", "📈 Model Performance", "⚙️ Settings"]
 )
 
 # API endpoints
@@ -74,6 +72,152 @@ def analyze_user(user_data):
     except Exception as e:
         st.error(f"Error analyzing user: {e}")
         return None
+
+def get_risk_level(score):
+    """Get risk level based on fake score"""
+    if score >= 0.7:
+        return "🔴 HIGH", "red"
+    elif score >= 0.4:
+        return "🟡 MEDIUM", "orange"
+    else:
+        return "🟢 LOW", "green"
+
+def get_status_emoji(is_fake):
+    """Get status emoji"""
+    return "🚨 FAKE" if is_fake else "✅ REAL"
+
+def display_user_analysis_table(users_data, platform_name):
+    """Display comprehensive user analysis table"""
+    if not users_data:
+        st.warning(f"No {platform_name} data available")
+        return
+    
+    df = pd.DataFrame(users_data)
+    
+    st.subheader(f"👥 {platform_name} User Analysis")
+    
+    # Create the table with detailed information
+    for i, user in enumerate(users_data):
+        with st.expander(f"👤 {user['username']} - {get_status_emoji(user['is_fake'])}", expanded=False):
+            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+            
+            with col1:
+                st.write(f"**Username:** {user['username']}")
+                st.write(f"**Bio:** {user['bio'][:100]}{'...' if len(user['bio']) > 100 else ''}")
+                st.write(f"**Email:** {user['email']}")
+            
+            with col2:
+                score = user['fake_score']
+                risk_level, color = get_risk_level(score)
+                st.metric("Fake Score", f"{score:.3f}")
+                st.write(f"**Risk:** {risk_level}")
+            
+            with col3:
+                st.metric("Followers", user['follower_count'])
+                st.metric("Following", user['following_count'])
+                st.metric("Posts", user.get('post_count', user.get('tweet_count', 0)))
+            
+            with col4:
+                st.write(f"**Status:** {get_status_emoji(user['is_fake'])}")
+                st.write(f"**Created:** {user['created_at'][:10]}")
+                
+                # Show detailed analysis if available
+                if user.get('analysis_data') and user['analysis_data'] != '{}':
+                    try:
+                        analysis = json.loads(user['analysis_data'])
+                        if 'feature_importance' in analysis:
+                            st.write("**Top Risk Factors:**")
+                            for feature, importance in list(analysis['feature_importance'].items())[:3]:
+                                st.write(f"• {feature}: {importance:.3f}")
+                    except:
+                        pass
+
+def display_detailed_user_card(user_data, platform):
+    """Display detailed analysis for a single user"""
+    st.subheader(f"🔍 Detailed Analysis: {user_data['username']}")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # User basic info
+        st.write(f"**Platform:** {platform}")
+        st.write(f"**Username:** {user_data['username']}")
+        st.write(f"**Bio:** {user_data['bio']}")
+        st.write(f"**Email:** {user_data['email']}")
+        st.write(f"**Created:** {user_data['created_at']}")
+        
+        # Network info
+        st.write(f"**Followers:** {user_data['follower_count']}")
+        st.write(f"**Following:** {user_data['following_count']}")
+        st.write(f"**Posts:** {user_data.get('post_count', user_data.get('tweet_count', 0))}")
+    
+    with col2:
+        # Fake detection results
+        score = user_data['fake_score']
+        risk_level, color = get_risk_level(score)
+        
+        st.metric("Fake Score", f"{score:.3f}", delta=None)
+        st.write(f"**Risk Level:** {risk_level}")
+        st.write(f"**Status:** {get_status_emoji(user_data['is_fake'])}")
+        
+        # Progress bar for fake score
+        st.progress(score)
+    
+    # Detailed analysis breakdown
+    if user_data.get('analysis_data') and user_data['analysis_data'] != '{}':
+        try:
+            analysis = json.loads(user_data['analysis_data'])
+            
+            st.markdown("---")
+            st.subheader("📊 Detailed Analysis Breakdown")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**🔤 Username Analysis:**")
+                username_features = {k: v for k, v in analysis.get('feature_importance', {}).items() 
+                                   if 'username' in k.lower()}
+                for feature, importance in sorted(username_features.items(), key=lambda x: x[1], reverse=True)[:3]:
+                    st.write(f"• {feature}: {importance:.3f}")
+                
+                st.write("**💬 Bio Analysis:**")
+                bio_features = {k: v for k, v in analysis.get('feature_importance', {}).items() 
+                              if 'bio' in k.lower() or 'sentiment' in k.lower()}
+                for feature, importance in sorted(bio_features.items(), key=lambda x: x[1], reverse=True)[:3]:
+                    st.write(f"• {feature}: {importance:.3f}")
+            
+            with col2:
+                st.write("**👥 Network Analysis:**")
+                network_features = {k: v for k, v in analysis.get('feature_importance', {}).items() 
+                                  if 'follower' in k.lower() or 'following' in k.lower() or 'network' in k.lower()}
+                for feature, importance in sorted(network_features.items(), key=lambda x: x[1], reverse=True)[:3]:
+                    st.write(f"• {feature}: {importance:.3f}")
+                
+                st.write("**📅 Account Analysis:**")
+                account_features = {k: v for k, v in analysis.get('feature_importance', {}).items() 
+                                  if 'age' in k.lower() or 'created' in k.lower() or 'activity' in k.lower()}
+                for feature, importance in sorted(account_features.items(), key=lambda x: x[1], reverse=True)[:3]:
+                    st.write(f"• {feature}: {importance:.3f}")
+            
+            # Feature importance chart
+            if 'feature_importance' in analysis:
+                st.markdown("---")
+                st.subheader("📈 Feature Importance")
+                
+                features = list(analysis['feature_importance'].keys())[:10]
+                importance = list(analysis['feature_importance'].values())[:10]
+                
+                fig = px.bar(
+                    x=importance,
+                    y=features,
+                    orientation='h',
+                    title="Top Contributing Features",
+                    labels={'x': 'Importance', 'y': 'Feature'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+        except Exception as e:
+            st.error(f"Error parsing analysis data: {e}")
 
 # Overview Page
 if page == "📊 Overview":
@@ -143,7 +287,7 @@ if page == "📊 Overview":
                 y='following_count',
                 color='is_fake',
                 title='Followers vs Following',
-                hover_data=['username', 'platform']
+                labels={'follower_count': 'Followers', 'following_count': 'Following'}
             )
             st.plotly_chart(fig3, use_container_width=True)
         
@@ -154,252 +298,198 @@ if page == "📊 Overview":
                 y='follower_count',
                 color='platform',
                 title='Fake Score vs Followers',
-                hover_data=['username']
+                labels={'fake_score': 'Fake Score', 'follower_count': 'Followers'}
             )
             st.plotly_chart(fig4, use_container_width=True)
+
+# User Analysis Page
+elif page == "👥 User Analysis":
+    st.title("👥 Real-Time User Analysis")
+    st.markdown("---")
+    
+    # Fetch data
+    instagram_data = fetch_data_from_api(INSTAGRAM_API)
+    twitter_data = fetch_data_from_api(TWITTER_API)
+    
+    # Display user analysis tables
+    display_user_analysis_table(instagram_data, "Instagram")
+    st.markdown("---")
+    display_user_analysis_table(twitter_data, "Twitter")
 
 # Single User Analysis Page
 elif page == "🔍 Single User Analysis":
     st.title("🔍 Single User Analysis")
     st.markdown("---")
     
-    # User input
+    # Manual user input
+    st.subheader("Enter User Details")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Enter User Data")
-        
-        username = st.text_input("Username", placeholder="Enter username")
-        bio = st.text_area("Bio", placeholder="Enter user bio")
-        
-        col1_1, col1_2 = st.columns(2)
-        with col1_1:
-            follower_count = st.number_input("Followers", min_value=0, value=100)
-            post_count = st.number_input("Posts", min_value=0, value=10)
-        
-        with col1_2:
-            following_count = st.number_input("Following", min_value=0, value=50)
-            account_age_days = st.number_input("Account Age (days)", min_value=0, value=30)
+        username = st.text_input("Username", placeholder="e.g., user123456")
+        bio = st.text_area("Bio", placeholder="Enter user bio...")
     
     with col2:
-        st.subheader("Analysis Results")
-        
-        if st.button("🔍 Analyze User", type="primary"):
-            if username:
-                user_data = {
-                    'username': username,
-                    'bio': bio,
-                    'created_at': (datetime.now() - pd.Timedelta(days=account_age_days)).isoformat(),
-                    'follower_count': follower_count,
-                    'following_count': following_count,
-                    'post_count': post_count
-                }
+        follower_count = st.number_input("Followers", min_value=0, value=0)
+        following_count = st.number_input("Following", min_value=0, value=0)
+        post_count = st.number_input("Posts", min_value=0, value=0)
+    
+    if st.button("🔍 Analyze User"):
+        if username:
+            user_data = {
+                'username': username,
+                'bio': bio,
+                'follower_count': follower_count,
+                'following_count': following_count,
+                'post_count': post_count,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            result = analyze_user(user_data)
+            if result:
+                st.success("Analysis completed!")
                 
-                result = analyze_user(user_data)
+                # Display results
+                col1, col2, col3 = st.columns(3)
                 
-                if result:
-                    # Display results
-                    col2_1, col2_2 = st.columns(2)
+                with col1:
+                    st.metric("Fake Score", f"{result['fake_probability']:.3f}")
+                
+                with col2:
+                    status = "🚨 FAKE" if result['is_fake'] else "✅ REAL"
+                    st.metric("Status", status)
+                
+                with col3:
+                    risk_level, _ = get_risk_level(result['fake_probability'])
+                    st.metric("Risk Level", risk_level)
+                
+                # Progress bar
+                st.progress(result['fake_probability'])
+                
+                # Feature importance
+                if 'explanation' in result and 'feature_importance' in result['explanation']:
+                    st.subheader("📊 Top Contributing Features")
                     
-                    with col2_1:
-                        if result['is_fake']:
-                            st.error("🚨 FAKE ACCOUNT DETECTED")
-                        else:
-                            st.success("✅ LEGITIMATE ACCOUNT")
-                        
-                        st.metric("Fake Probability", f"{result['fake_probability']:.2%}")
-                        st.metric("Real Probability", f"{result['real_probability']:.2%}")
+                    features = list(result['explanation']['feature_importance'].keys())[:10]
+                    importance = list(result['explanation']['feature_importance'].values())[:10]
                     
-                    with col2_2:
-                        st.metric("Followers", follower_count)
-                        st.metric("Following", following_count)
-                        st.metric("Posts", post_count)
-                    
-                    # Feature importance
-                    st.subheader("🔍 Feature Analysis")
-                    if 'explanation' in result:
-                        importance = result['explanation']['feature_importance']
-                        
-                        # Create feature importance chart
-                        fig = px.bar(
-                            x=list(importance.values()),
-                            y=list(importance.keys()),
-                            orientation='h',
-                            title='Top Contributing Features'
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Show detailed features
-                        st.subheader("📊 Detailed Features")
-                        features = result['features']
-                        
-                        col3, col4 = st.columns(2)
-                        
-                        with col3:
-                            st.write("**Username Features:**")
-                            st.write(f"- Length: {features.get('username_length', 0)}")
-                            st.write(f"- Entropy: {features.get('username_entropy', 0):.2f}")
-                            st.write(f"- Has numbers: {features.get('username_has_numbers', 0)}")
-                            st.write(f"- Has special chars: {features.get('username_has_special_chars', 0)}")
-                        
-                        with col4:
-                            st.write("**Network Features:**")
-                            st.write(f"- Follower ratio: {features.get('follower_following_ratio', 0):.2f}")
-                            st.write(f"- Network balance: {features.get('network_balance', 0):.2f}")
-                            st.write(f"- High following/low followers: {features.get('high_following_low_followers', 0)}")
-                            st.write(f"- Zero followers: {features.get('zero_followers', 0)}")
-            else:
-                st.warning("Please enter a username to analyze")
+                    fig = px.bar(
+                        x=importance,
+                        y=features,
+                        orientation='h',
+                        title="Feature Importance",
+                        labels={'x': 'Importance', 'y': 'Feature'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
 # Batch Analysis Page
 elif page == "📁 Batch Analysis":
     st.title("📁 Batch Analysis")
     st.markdown("---")
     
-    # File upload
-    st.subheader("Upload CSV File")
-    uploaded_file = st.file_uploader(
-        "Choose a CSV file with user data",
-        type=['csv'],
-        help="CSV should have columns: username, bio, follower_count, following_count, post_count"
-    )
+    uploaded_file = st.file_uploader("Upload CSV file with user data", type=['csv'])
     
     if uploaded_file is not None:
-        try:
-            df = pd.read_csv(uploaded_file)
-            st.success(f"✅ Loaded {len(df)} users from file")
-            
-            # Show preview
-            st.subheader("📋 Data Preview")
-            st.dataframe(df.head())
-            
-            if st.button("🔍 Analyze All Users", type="primary"):
-                if detector is None:
-                    st.error("No trained model available")
-                else:
-                    # Prepare data for analysis
-                    users_data = []
-                    for _, row in df.iterrows():
-                        user_data = {
-                            'username': row['username'],
-                            'bio': row.get('bio', ''),
-                            'created_at': row.get('created_at', datetime.now().isoformat()),
-                            'follower_count': row['follower_count'],
-                            'following_count': row['following_count'],
-                            'post_count': row['post_count']
-                        }
-                        users_data.append(user_data)
-                    
-                    # Analyze users
-                    with st.spinner("Analyzing users..."):
-                        results = detector.predict_batch(users_data)
-                    
-                    # Create results dataframe
-                    results_df = pd.DataFrame(results)
-                    
-                    # Display results
-                    st.subheader("📊 Analysis Results")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Total Users", len(results_df))
-                    with col2:
-                        fake_count = len(results_df[results_df['is_fake'] == True])
-                        st.metric("Fake Accounts", fake_count)
-                    with col3:
-                        fake_percentage = fake_count / len(results_df) * 100
-                        st.metric("Fake Percentage", f"{fake_percentage:.1f}%")
-                    
-                    # Results table
-                    st.subheader("📋 Detailed Results")
-                    st.dataframe(results_df)
-                    
-                    # Download results
-                    csv = results_df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Download Results",
-                        data=csv,
-                        file_name="fake_account_analysis_results.csv",
-                        mime="text/csv"
-                    )
-                    
-                    # Visualizations
-                    st.subheader("📈 Visualizations")
-                    
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        fig = px.histogram(
-                            results_df,
-                            x='fake_probability',
-                            title='Fake Probability Distribution',
-                            nbins=20
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with col2:
-                        fig2 = px.scatter(
-                            results_df,
-                            x='follower_count',
-                            y='fake_probability',
-                            color='is_fake',
-                            title='Followers vs Fake Probability',
-                            hover_data=['username']
-                        )
-                        st.plotly_chart(fig2, use_container_width=True)
+        df = pd.read_csv(uploaded_file)
+        st.write("Uploaded data:")
+        st.dataframe(df.head())
         
-        except Exception as e:
-            st.error(f"Error processing file: {e}")
+        if st.button("🔍 Analyze Batch"):
+            results = []
+            
+            for _, row in df.iterrows():
+                user_data = {
+                    'username': row.get('username', ''),
+                    'bio': row.get('bio', ''),
+                    'follower_count': row.get('follower_count', 0),
+                    'following_count': row.get('following_count', 0),
+                    'post_count': row.get('post_count', 0),
+                    'created_at': row.get('created_at', datetime.now().isoformat())
+                }
+                
+                result = analyze_user(user_data)
+                if result:
+                    results.append({
+                        'username': user_data['username'],
+                        'fake_score': result['fake_probability'],
+                        'is_fake': result['is_fake'],
+                        'status': get_status_emoji(result['is_fake'])
+                    })
+            
+            if results:
+                results_df = pd.DataFrame(results)
+                st.success(f"Analysis completed for {len(results)} users!")
+                
+                # Display results
+                st.subheader("📊 Batch Analysis Results")
+                st.dataframe(results_df)
+                
+                # Download results
+                csv = results_df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Results",
+                    data=csv,
+                    file_name="batch_analysis_results.csv",
+                    mime="text/csv"
+                )
+                
+                # Visualizations
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    fig = px.histogram(
+                        results_df,
+                        x='fake_score',
+                        title='Fake Score Distribution',
+                        nbins=20
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    fake_count = len(results_df[results_df['is_fake'] == True])
+                    real_count = len(results_df[results_df['is_fake'] == False])
+                    
+                    fig = px.pie(
+                        values=[fake_count, real_count],
+                        names=['Fake', 'Real'],
+                        title='Fake vs Real Distribution'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
 # Model Performance Page
 elif page == "📈 Model Performance":
     st.title("📈 Model Performance")
     st.markdown("---")
     
-    if detector is None:
-        st.error("No trained model available")
-    else:
+    if detector:
         # Feature importance
-        st.subheader("🔍 Feature Importance")
-        importance = detector.get_feature_importance()
-        
-        fig = px.bar(
-            x=list(importance.values())[:15],
-            y=list(importance.keys())[:15],
-            orientation='h',
-            title='Top 15 Most Important Features'
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        feature_importance = detector.get_feature_importance()
+        if feature_importance:
+            st.subheader("🔍 Feature Importance")
+            
+            # Get top 15 features
+            top_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)[:15]
+            features, importance = zip(*top_features)
+            
+            fig = px.bar(
+                x=importance,
+                y=features,
+                orientation='h',
+                title="Top 15 Most Important Features",
+                labels={'x': 'Importance', 'y': 'Feature'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
         
         # Model evaluation
-        st.subheader("📊 Model Evaluation")
-        if st.button("🔄 Evaluate Model"):
+        if st.button("📊 Evaluate Model"):
             with st.spinner("Evaluating model..."):
                 try:
-                    evaluation = detector.evaluate_model()
+                    accuracy, report = detector.evaluate_model()
+                    st.success(f"Model Accuracy: {accuracy:.2%}")
                     
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.metric("Accuracy", f"{evaluation['accuracy']:.2%}")
-                    
-                    with col2:
-                        st.metric("Test Samples", len(evaluation['true_labels']))
-                    
-                    # Confusion matrix
-                    from sklearn.metrics import confusion_matrix
-                    cm = confusion_matrix(evaluation['true_labels'], evaluation['predictions'])
-                    
-                    fig = px.imshow(
-                        cm,
-                        text_auto=True,
-                        aspect="auto",
-                        title="Confusion Matrix",
-                        labels=dict(x="Predicted", y="Actual"),
-                        x=['Real', 'Fake'],
-                        y=['Real', 'Fake']
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.subheader("📋 Classification Report")
+                    st.text(report)
                     
                 except Exception as e:
                     st.error(f"Error evaluating model: {e}")
@@ -409,75 +499,46 @@ elif page == "⚙️ Settings":
     st.title("⚙️ Settings")
     st.markdown("---")
     
-    st.subheader("🔧 Model Management")
-    
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🔄 Retrain Model", type="primary"):
-            if detector is None:
-                st.error("Detector not initialized")
-            else:
-                with st.spinner("Training model..."):
-                    try:
-                        X, y = detector.prepare_training_data()
-                        accuracy = detector.train_model(X, y)
-                        st.success(f"✅ Model retrained successfully! Accuracy: {accuracy:.2%}")
-                    except Exception as e:
-                        st.error(f"Error training model: {e}")
-    
-    with col2:
+        st.subheader("🔄 System Actions")
+        
+        if st.button("🤖 Retrain Model"):
+            with st.spinner("Retraining model..."):
+                try:
+                    X, y = detector.prepare_training_data()
+                    accuracy = detector.train_model(X, y)
+                    st.success(f"Model retrained! Accuracy: {accuracy:.2%}")
+                except Exception as e:
+                    st.error(f"Error retraining model: {e}")
+        
         if st.button("📊 Generate Test Data"):
-            try:
-                from fake_detection.data_generator import DataGenerator
-                generator = DataGenerator()
-                test_data = generator.generate_test_data(100)
-                
-                df = pd.DataFrame(test_data)
-                df.to_csv('data/test_data.csv', index=False)
-                st.success("✅ Test data generated successfully!")
-            except Exception as e:
-                st.error(f"Error generating test data: {e}")
-    
-    st.subheader("📁 Data Management")
-    
-    # Show data files
-    data_files = []
-    if os.path.exists('data'):
-        for file in os.listdir('data'):
-            if file.endswith(('.csv', '.json')):
-                file_path = os.path.join('data', file)
-                size = os.path.getsize(file_path)
-                data_files.append({
-                    'File': file,
-                    'Size': f"{size / 1024:.1f} KB",
-                    'Modified': datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M')
-                })
-    
-    if data_files:
-        st.dataframe(pd.DataFrame(data_files))
-    else:
-        st.info("No data files found in data/ directory")
-    
-    st.subheader("🔗 API Configuration")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.write("**Instagram API:**")
-        st.code("http://localhost:5001/api/users")
+            with st.spinner("Generating test data..."):
+                try:
+                    from fake_detection.data_generator import DataGenerator
+                    generator = DataGenerator()
+                    generator.generate_training_data(1000, 1000)
+                    st.success("Test data generated successfully!")
+                except Exception as e:
+                    st.error(f"Error generating test data: {e}")
     
     with col2:
-        st.write("**Twitter API:**")
-        st.code("http://localhost:5002/api/users")
-
-# Footer
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: #666;'>
-        Fake Account Detection System | Built with Streamlit and Machine Learning
-    </div>
-    """,
-    unsafe_allow_html=True
-) 
+        st.subheader("📁 Data Files")
+        
+        data_files = [
+            "data/fake_accounts.json",
+            "data/real_accounts.json", 
+            "data/training_data.csv",
+            "fake_detection/models/fake_detector_model.pkl"
+        ]
+        
+        for file_path in data_files:
+            if os.path.exists(file_path):
+                st.write(f"✅ {file_path}")
+            else:
+                st.write(f"❌ {file_path}")
+        
+        st.subheader("🔗 API Endpoints")
+        st.write(f"Instagram: {INSTAGRAM_API}")
+        st.write(f"Twitter: {TWITTER_API}") 
